@@ -52,8 +52,8 @@ pub fn ui(f: &mut Frame, app: &mut App) {
                  let chunks = Layout::default()
                     .direction(Direction::Horizontal)
                     .constraints([
-                        Constraint::Percentage(50), // Music scales with window
-                        Constraint::Percentage(50), // Lyrics scales with window
+                        Constraint::Percentage(60), // Music scales (Bigger Art)
+                        Constraint::Percentage(40), // Lyrics scales
                     ])
                     .split(body_area);
                  (chunks[0], Some(chunks[1]), true)
@@ -120,9 +120,6 @@ pub fn ui(f: &mut Frame, app: &mut App) {
          ]
     } else {
         // Normal
-        // For Scalable Mode (>120 width), we want Art to grow.
-        // For Fixed Mode (45 width), Art is capped by width anyway, but Length(24) caps height.
-        // Let's use Min(20) to allow growth in both cases.
          vec![
             Constraint::Min(20),    // 0: Artwork (Takes available space!)
             Constraint::Length(4),  // 1: Info 
@@ -147,22 +144,35 @@ pub fn ui(f: &mut Frame, app: &mut App) {
         let available_width = music_chunks[art_idx].width as u32;
         let available_height = music_chunks[art_idx].height as u32;
         
-        let render_width = available_width;
-        let render_height = available_height * 2;
+        let target_width = available_width;
+        let target_height = available_height * 2;
         
-        if render_width > 0 && render_height > 0 {
+        if target_width > 0 && target_height > 0 {
             use image::imageops::FilterType;
             use image::GenericImageView;
             
-            // Resize raw image to exactly fit the box.
-            let resized = raw_image.resize_exact(render_width, render_height, FilterType::Triangle);
+            // Resize preserving aspect ratio (Triangle for quality)
+            let resized = raw_image.resize(target_width, target_height, FilterType::Triangle);
+            
+            // Vertical centering logic
+            let img_height_subpixels = resized.height();
+            let img_rows = (img_height_subpixels + 1) / 2; // integer ceil
+            
+            let total_rows = available_height;
+            let padding_top = total_rows.saturating_sub(img_rows) / 2;
             
             let mut lines = Vec::new();
-            for y in (0..render_height).step_by(2) {
+            
+            // Add top padding
+            for _ in 0..padding_top {
+                lines.push(Line::default());
+            }
+
+            for y in (0..img_height_subpixels).step_by(2) {
                 let mut spans = Vec::new();
-                for x in 0..render_width {
+                for x in 0..resized.width() {
                     let p1 = resized.get_pixel(x, y);
-                    let p2 = if y + 1 < render_height {
+                    let p2 = if y + 1 < img_height_subpixels {
                         resized.get_pixel(x, y + 1)
                     } else {
                         p1
