@@ -59,7 +59,7 @@ async fn main() -> Result<()> {
         // Standalone Resize Logic (e.g. iTerm/Terminal/Ghostty)
         // \x1b[8;ROWS;COLSt
         if want_lyrics {
-            print!("\x1b[8;60;80t"); // Full Size: 60 rows, 80 cols
+            print!("\x1b[8;80;100t"); // Full Size: 80 rows, 100 cols (Plenty for Lyrics)
         } else {
             print!("\x1b[8;33;51t"); // Mini Size: 33 rows, 51 cols
         }

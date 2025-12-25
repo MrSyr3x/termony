@@ -83,9 +83,11 @@ pub fn ui(f: &mut Frame, app: &mut App) {
 
     // Inner Music Layout
     let music_constraints = if is_compressed {
-        // Compact for 33 height: 24(art)+4(info)+1(gauge)+1(time)+(0 spacer)+1(controls) = 31 + 2(border) = 33
+        // Compact for 33 height: 
+        // 20(art) + 4(info) + 1(gauge) + 1(time) + 1(controls) = 27 + 2(border) = 29
+        // Leaves 4 lines buffer for 33 height window. buttons will be safe.
         vec![
-            Constraint::Length(24), // 0: Artwork
+            Constraint::Length(20), // 0: Artwork (Smaller)
             Constraint::Length(4),  // 1: Info 
             Constraint::Length(1),  // 2: Gauge (Row)
             Constraint::Length(1),  // 3: Time
