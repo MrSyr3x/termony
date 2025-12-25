@@ -131,32 +131,54 @@ pub fn ui(f: &mut Frame, app: &mut App) {
         .split(inner_music_area);
 
     // 1. Artwork
-    // Index 0 always
     let art_idx = 0;
     
-    if let Some(data) = &app.artwork {
-        let mut lines = Vec::new();
-        // Art might be clipped by Ratatui if area is too small.
-        for row in data {
-            let mut spans = Vec::new();
-            for (fg, bg) in row {
-                spans.push(Span::styled(
-                    "▀",
-                    Style::default()
-                        .fg(Color::Rgb(fg.0, fg.1, fg.2))
-                        .bg(Color::Rgb(bg.0, bg.1, bg.2))
-                ));
-            }
-            lines.push(Line::from(spans));
-        }
+    if let Some(raw_image) = &app.artwork {
+        // Calculate available area for artwork in characters
+        let available_width = music_chunks[art_idx].width as u32;
+        let available_height = music_chunks[art_idx].height as u32;
         
-        // Center vertically if there is space? Paragraph centers automatically if configured? 
-        // No, Paragraph aligns text within the block. 
-        // We just render.
-        let artwork_widget = Paragraph::new(lines)
-            .alignment(Alignment::Center)
-            .block(Block::default().style(Style::default().bg(Color::Reset)));
-        f.render_widget(artwork_widget, music_chunks[art_idx]);
+        // We render using half-blocks, so vertical resolution is doubled.
+        let render_width = available_width;
+        let render_height = available_height * 2;
+        
+        if render_width > 0 && render_height > 0 {
+            use image::imageops::FilterType;
+            use image::GenericImageView;
+            
+            // Resize raw image to exactly fit the box.
+            // This ensures it fills the "Big Artwork" space.
+            let resized = raw_image.resize_exact(render_width, render_height, FilterType::Nearest);
+            
+            let mut lines = Vec::new();
+            for y in (0..render_height).step_by(2) {
+                let mut spans = Vec::new();
+                for x in 0..render_width {
+                    let p1 = resized.get_pixel(x, y);
+                    let p2 = if y + 1 < render_height {
+                        resized.get_pixel(x, y + 1)
+                    } else {
+                        p1
+                    };
+
+                    let fg = (p1[0], p1[1], p1[2]);
+                    let bg = (p2[0], p2[1], p2[2]);
+                    
+                    spans.push(Span::styled(
+                        "▀",
+                        Style::default()
+                            .fg(Color::Rgb(fg.0, fg.1, fg.2))
+                            .bg(Color::Rgb(bg.0, bg.1, bg.2))
+                    ));
+                }
+                lines.push(Line::from(spans));
+            }
+            
+            let artwork_widget = Paragraph::new(lines)
+                .alignment(Alignment::Center)
+                .block(Block::default().style(Style::default().bg(Color::Reset)));
+            f.render_widget(artwork_widget, music_chunks[art_idx]);
+        }
     } else {
        // Placeholder
        let text = if app.track.is_some() {
