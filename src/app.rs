@@ -4,8 +4,11 @@ use crate::artwork::ArtworkData;
 
 use ratatui::layout::Rect;
 
+use crate::theme::Theme;
+
 pub struct App {
-    pub should_quit: bool,
+    pub theme: Theme,
+    pub is_running: bool,
     pub track: Option<TrackInfo>,
     pub lyrics: Option<Vec<LyricLine>>,
     pub artwork: Option<ArtworkData>,
@@ -29,8 +32,11 @@ pub struct App {
 
 impl App {
     pub fn new(show_lyrics: bool) -> Self {
+        let theme = crate::theme::load_current_theme();
+        
         Self {
-            should_quit: false,
+            theme,
+            is_running: true,
             track: None,
             lyrics: None,
             artwork: None,

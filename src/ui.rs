@@ -8,39 +8,9 @@ use ratatui::{
 use crate::app::App;
 use crate::spotify::PlayerState;
 
-// Catppuccin Mocha Palette
-#[allow(dead_code)]
-struct Mocha;
-#[allow(dead_code)]
-impl Mocha {
-    const ROSEWATER: Color = Color::Rgb(245, 224, 220);
-    const FLAMINGO: Color = Color::Rgb(242, 205, 205);
-    const PINK: Color = Color::Rgb(245, 194, 231);
-    const MAUVE: Color = Color::Rgb(203, 166, 247);
-    const RED: Color = Color::Rgb(243, 139, 168);
-    const MAROON: Color = Color::Rgb(235, 160, 172);
-    const PEACH: Color = Color::Rgb(250, 179, 135);
-    const YELLOW: Color = Color::Rgb(249, 226, 175);
-    const GREEN: Color = Color::Rgb(166, 227, 161);
-    const TEAL: Color = Color::Rgb(148, 226, 213);
-    const SKY: Color = Color::Rgb(137, 220, 235);
-    const SAPPHIRE: Color = Color::Rgb(116, 199, 236);
-    const BLUE: Color = Color::Rgb(137, 180, 250);
-    const LAVENDER: Color = Color::Rgb(180, 190, 254);
-    const TEXT: Color = Color::Rgb(205, 214, 244);
-    const SUBTEXT1: Color = Color::Rgb(186, 194, 222);
-    const OVERLAY2: Color = Color::Rgb(147, 153, 178);
-    const OVERLAY1: Color = Color::Rgb(127, 132, 156);
-    const OVERLAY0: Color = Color::Rgb(108, 112, 134);
-    const SURFACE2: Color = Color::Rgb(88, 91, 112);
-    const SURFACE1: Color = Color::Rgb(69, 71, 90);
-    const SURFACE0: Color = Color::Rgb(49, 50, 68);
-    const BASE: Color = Color::Rgb(30, 30, 46);
-    const MANTLE: Color = Color::Rgb(24, 24, 37);
-    const CRUST: Color = Color::Rgb(17, 17, 27);
-}
-
 pub fn ui(f: &mut Frame, app: &mut App) {
+    let theme = &app.theme;
+
     // Responsive Layout Check
     let area = f.area();
     // Mini Mode Rule: 
@@ -71,7 +41,7 @@ pub fn ui(f: &mut Frame, app: &mut App) {
 
     // --- MUSIC CARD ---
     let music_title = Title::from(Line::from(vec![
-        Span::styled(" termony ", Style::default().fg(Mocha::CRUST).bg(Mocha::BLUE).add_modifier(Modifier::BOLD))
+        Span::styled(" termony ", Style::default().fg(theme.base).bg(theme.blue).add_modifier(Modifier::BOLD))
     ]));
 
     let music_block = Block::default()
@@ -79,7 +49,7 @@ pub fn ui(f: &mut Frame, app: &mut App) {
         .border_type(BorderType::Rounded)
         .title(music_title)
         .title_alignment(Alignment::Center)
-        .border_style(Style::default().fg(Mocha::BLUE)) 
+        .border_style(Style::default().fg(theme.blue)) 
         .style(Style::default().bg(Color::Reset));
     
     let music_area = music_block.inner(main_chunks[0]);
@@ -151,7 +121,7 @@ pub fn ui(f: &mut Frame, app: &mut App) {
        };
        let p = Paragraph::new(text)
            .alignment(Alignment::Center)
-           .block(Block::default().style(Style::default().fg(Mocha::OVERLAY0).bg(Color::Reset)));
+           .block(Block::default().style(Style::default().fg(theme.overlay).bg(Color::Reset)));
        f.render_widget(p, artwork_area);
     }
 
@@ -160,15 +130,15 @@ pub fn ui(f: &mut Frame, app: &mut App) {
         let info_text = vec![
             Line::from(Span::styled(
                 format!("🎵 {}", track.name),
-                Style::default().fg(Mocha::TEXT).add_modifier(Modifier::BOLD)
+                Style::default().fg(theme.text).add_modifier(Modifier::BOLD)
             )),
             Line::from(vec![
                 Span::raw("🎤 "),
-                Span::styled(&track.artist, Style::default().fg(Mocha::PINK)), 
+                Span::styled(&track.artist, Style::default().fg(theme.magenta)), 
             ]),
             Line::from(vec![
                 Span::raw("💿 "),
-                Span::styled(&track.album, Style::default().fg(Mocha::TEAL).add_modifier(Modifier::DIM)), 
+                Span::styled(&track.album, Style::default().fg(theme.cyan).add_modifier(Modifier::DIM)), 
             ]),
         ];
         
@@ -196,8 +166,8 @@ pub fn ui(f: &mut Frame, app: &mut App) {
         // Custom Texture Gauge
         let width = gauge_area.width as usize;
         let occupied_width = (width as f64 * ratio.min(1.0).max(0.0)) as usize;
-        let fill_style = Style::default().fg(Mocha::MAUVE);
-        let empty_style = Style::default().fg(Mocha::SURFACE2);
+        let fill_style = Style::default().fg(theme.magenta);
+        let empty_style = Style::default().fg(theme.surface);
         
         let mut bar_spans: Vec<Span> = Vec::with_capacity(width);
         for i in 0..width {
@@ -231,12 +201,12 @@ pub fn ui(f: &mut Frame, app: &mut App) {
         );
         let time_label = Paragraph::new(time_str)
             .alignment(Alignment::Center)
-            .style(Style::default().fg(Mocha::OVERLAY1));
+            .style(Style::default().fg(theme.overlay));
         f.render_widget(time_label, music_chunks[3]);
 
         // 5. Controls
         let play_icon = if track.state == PlayerState::Playing { "⏸" } else { "▶" };
-        let btn_style = Style::default().fg(Mocha::TEXT).add_modifier(Modifier::BOLD);
+        let btn_style = Style::default().fg(theme.text).add_modifier(Modifier::BOLD);
         
         let prev_str = "   ⏮   ";
         let next_str = "   ⏭   ";
@@ -268,13 +238,13 @@ pub fn ui(f: &mut Frame, app: &mut App) {
         // --- LYRICS CARD ---
         if !is_compressed {
             let lyrics_title = Title::from(Line::from(vec![
-                Span::styled(" lyrics ", Style::default().fg(Mocha::CRUST).bg(Mocha::MAUVE).add_modifier(Modifier::BOLD))
+                Span::styled(" lyrics ", Style::default().fg(theme.base).bg(theme.magenta).add_modifier(Modifier::BOLD))
             ]));
 
             let credits_title = Line::from(vec![
                 Span::styled(" ~ by syr3x </3 ", Style::default()
-                    .bg(Color::Rgb(235, 111, 146)) // #eb6f92
-                    .fg(Mocha::CRUST)              // Dark Text
+                    .bg(Color::Rgb(235, 111, 146)) // #eb6f92  (Keep hardcoded as requested)
+                    .fg(theme.base)                // Use theme base (dark) for contrast, or explicit crust? Theme base should be safe.
                     .add_modifier(Modifier::BOLD | Modifier::ITALIC))
             ]);
 
@@ -284,7 +254,7 @@ pub fn ui(f: &mut Frame, app: &mut App) {
                 .title(lyrics_title)
                 .title_alignment(Alignment::Center)
                 .title_bottom(credits_title)
-                .border_style(Style::default().fg(Mocha::MAUVE))
+                .border_style(Style::default().fg(theme.magenta))
                 .style(Style::default().bg(Color::Reset));
                 
             let lyrics_area = lyrics_block.inner(main_chunks[1]);
@@ -315,14 +285,14 @@ pub fn ui(f: &mut Frame, app: &mut App) {
                
                for (offset, (i, line)) in lyrics.iter().enumerate().skip(start_idx).take(end_idx - start_idx).enumerate() {
                    let style = if i == current_idx {
-                       Style::default().add_modifier(Modifier::BOLD).fg(Mocha::GREEN)
+                       Style::default().add_modifier(Modifier::BOLD).fg(theme.green)
                    } else {
-                       Style::default().fg(Mocha::OVERLAY0)
+                       Style::default().fg(theme.overlay)
                    };
                    
                    let prefix = if i == current_idx { "● " } else { "  " };
                    let prefix_span = if i == current_idx {
-                       Span::styled(prefix, Style::default().fg(Mocha::GREEN))
+                       Span::styled(prefix, Style::default().fg(theme.green))
                    } else {
                         Span::styled(prefix, style)
                    };
@@ -344,7 +314,7 @@ pub fn ui(f: &mut Frame, app: &mut App) {
                f.render_widget(lyrics_widget, lyrics_area);
 
             } else {
-                let no_lyrics = Paragraph::new(Text::styled("\nNo Lyrics Found", Style::default().fg(Mocha::OVERLAY0)))
+                let no_lyrics = Paragraph::new(Text::styled("\nNo Lyrics Found", Style::default().fg(theme.overlay)))
                     .alignment(Alignment::Center)
                      .block(Block::default().style(Style::default().bg(Color::Reset)));
                  f.render_widget(no_lyrics, lyrics_area);
@@ -352,19 +322,19 @@ pub fn ui(f: &mut Frame, app: &mut App) {
         }
 
         // --- FOOTER (Rendered outside !is_compressed) ---
-        let desc_style = Style::default().fg(Mocha::SUBTEXT1); 
+        let desc_style = Style::default().fg(theme.overlay); // subtext1 map to overlay 
         
         let footer_text = Line::from(vec![
-            Span::styled(" q ", Style::default().fg(Mocha::RED).add_modifier(Modifier::BOLD)), 
+            Span::styled(" q ", Style::default().fg(theme.red).add_modifier(Modifier::BOLD)), 
             Span::styled("Exit   ", desc_style),
             
-            Span::styled("n ", Style::default().fg(Mocha::SAPPHIRE).add_modifier(Modifier::BOLD)), 
+            Span::styled("n ", Style::default().fg(theme.blue).add_modifier(Modifier::BOLD)), 
             Span::styled("Next   ", desc_style),
             
-            Span::styled("p ", Style::default().fg(Mocha::SAPPHIRE).add_modifier(Modifier::BOLD)), 
+            Span::styled("p ", Style::default().fg(theme.blue).add_modifier(Modifier::BOLD)), 
             Span::styled("Prev   ", desc_style),
             
-            Span::styled("Space ", Style::default().fg(Mocha::GREEN).add_modifier(Modifier::BOLD)), 
+            Span::styled("Space ", Style::default().fg(theme.green).add_modifier(Modifier::BOLD)), 
             Span::styled("Play/Pause", desc_style),
         ]);
         
@@ -377,7 +347,7 @@ pub fn ui(f: &mut Frame, app: &mut App) {
         // IDLE STATE
         let t = Paragraph::new("Music Paused / Not Running")
             .alignment(Alignment::Center)
-            .style(Style::default().fg(Mocha::TEXT))
+            .style(Style::default().fg(theme.text))
             .block(Block::default().borders(Borders::ALL).border_type(BorderType::Rounded).title(Title::from(Line::from(vec![Span::styled(" termony ", Style::default().bg(Color::Reset).add_modifier(Modifier::BOLD))]))).title_alignment(Alignment::Center).style(Style::default().bg(Color::Reset)));
         f.render_widget(t, main_chunks[0]);
     }

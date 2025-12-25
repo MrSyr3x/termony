@@ -13,6 +13,7 @@ mod app;
 mod artwork;
 mod lyrics;
 mod spotify;
+mod theme;
 mod ui;
 
 use app::{App};
@@ -181,7 +182,7 @@ async fn main() -> Result<()> {
                 },
                 AppEvent::Input(Event::Key(key)) => {
                     match key.code {
-                        KeyCode::Char('q') => app.should_quit = true,
+                        KeyCode::Char('q') => app.is_running = false,
                         KeyCode::Char(' ') => { let _ = Spotify::play_pause(); },
                         KeyCode::Char('n') => { let _ = Spotify::next(); },
                         KeyCode::Char('p') => { let _ = Spotify::prev(); },
@@ -232,7 +233,7 @@ async fn main() -> Result<()> {
             }
         }
         
-        if app.should_quit { break; }
+        if !app.is_running { break; }
     }
 
     disable_raw_mode()?;
