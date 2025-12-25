@@ -92,7 +92,7 @@ pub fn ui(f: &mut Frame, app: &mut App) {
 
     // --- MUSIC CARD ---
     let music_title = Title::from(Line::from(vec![
-        Span::styled(" vyom ", Style::default().fg(theme.base).bg(theme.blue).add_modifier(Modifier::BOLD))
+        Span::styled(" Vyom ", Style::default().fg(theme.base).bg(theme.blue).add_modifier(Modifier::BOLD))
     ]));
 
     let music_block = Block::default()
@@ -137,12 +137,32 @@ pub fn ui(f: &mut Frame, app: &mut App) {
         .split(inner_music_area);
 
     // 1. Artwork
-    let art_idx = 0;
+    let _art_idx = 0;
+    
+    // Add 2 lines of padding at top of artwork chunk itself to separate from Border Title (Vyom)
+    let artwork_area = if music_chunks.len() > 0 {
+         let area = music_chunks[0];
+         // Only shrink if we have space, else use as is
+         if area.height > 2 {
+             Layout::default()
+                 .direction(Direction::Vertical)
+                 .constraints([
+                     Constraint::Length(1), // Top Padding
+                     Constraint::Min(1),    // Art
+                 ])
+                 .split(area)[1]
+         } else {
+             area
+         }
+    } else {
+        Rect::default()
+    };
+
     
     if let Some(raw_image) = &app.artwork {
         // Calculate available area for artwork in characters
-        let available_width = music_chunks[art_idx].width as u32;
-        let available_height = music_chunks[art_idx].height as u32;
+        let available_width = artwork_area.width as u32;
+        let available_height = artwork_area.height as u32;
         
         let target_width = available_width;
         let target_height = available_height * 2;
@@ -194,7 +214,7 @@ pub fn ui(f: &mut Frame, app: &mut App) {
             let artwork_widget = Paragraph::new(lines)
                 .alignment(Alignment::Center)
                 .block(Block::default().style(Style::default().bg(Color::Reset)));
-            f.render_widget(artwork_widget, music_chunks[art_idx]);
+            f.render_widget(artwork_widget, artwork_area);
         }
 
     } else {
@@ -207,7 +227,7 @@ pub fn ui(f: &mut Frame, app: &mut App) {
        let p = Paragraph::new(text)
            .alignment(Alignment::Center)
            .block(Block::default().style(Style::default().fg(theme.overlay).bg(Color::Reset)));
-       f.render_widget(p, music_chunks[art_idx]);
+       f.render_widget(p, artwork_area);
     }
 
     // 2. Info
@@ -347,7 +367,7 @@ pub fn ui(f: &mut Frame, app: &mut App) {
     // --- LYRICS CARD ---
     if let Some(lyrics_area_rect) = lyrics_area {
         let lyrics_title = Title::from(Line::from(vec![
-            Span::styled(" lyrics ", Style::default().fg(theme.base).bg(theme.magenta).add_modifier(Modifier::BOLD))
+            Span::styled(" Lyrics ", Style::default().fg(theme.base).bg(theme.magenta).add_modifier(Modifier::BOLD))
         ]));
 
         let credits_title = Line::from(vec![
@@ -436,13 +456,13 @@ pub fn ui(f: &mut Frame, app: &mut App) {
         Span::styled(" q ", Style::default().fg(theme.red).add_modifier(Modifier::BOLD)), 
         Span::styled("Exit   ", desc_style),
         
-        Span::styled("n ", Style::default().fg(theme.blue).add_modifier(Modifier::BOLD)), 
+        Span::styled(" n ", Style::default().fg(theme.blue).add_modifier(Modifier::BOLD)), 
         Span::styled("Next   ", desc_style),
         
-        Span::styled("p ", Style::default().fg(theme.blue).add_modifier(Modifier::BOLD)), 
+        Span::styled(" p ", Style::default().fg(theme.blue).add_modifier(Modifier::BOLD)), 
         Span::styled("Prev   ", desc_style),
         
-        Span::styled("Space ", Style::default().fg(theme.green).add_modifier(Modifier::BOLD)), 
+        Span::styled(" Space ", Style::default().fg(theme.green).add_modifier(Modifier::BOLD)), 
         Span::styled("Play/Pause", desc_style),
     ]);
     
