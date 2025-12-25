@@ -33,30 +33,35 @@ async fn main() -> Result<()> {
     let is_standalone = args.iter().any(|a| a == "--standalone");
     let is_tmux = std::env::var("TMUX").is_ok();
 
+    // Smart Window Logic
+    let want_lyrics = args.iter().any(|a| a == "--lyrics");
+    
     if is_tmux && !is_standalone {
-        // Auto-split logic
+        // Auto-split logic (Tmux)
         let current_exe = std::env::current_exe()?;
         let exe_path = current_exe.to_str().unwrap();
-        
-        // tmux split-window -h -l 35% "path/to/exe --standalone"
-        // Using -l 35% is safer than -p 35 in some versions, but -p is standard.
-        // Let's use -d to not focus the new pane immediately? Users usually want to see it but keep typing in main?
-        // Python version focused original pane.
         
         let status = std::process::Command::new("tmux")
             .arg("split-window")
             .arg("-h")
             .arg("-p")
             .arg("35")
-            .arg(format!("{} --standalone", exe_path))
+            .arg(format!("{} --standalone {}", exe_path, if want_lyrics { "--lyrics" } else { "" }))
             .status();
 
         match status {
             Ok(_) => return Ok(()),
             Err(e) => {
                 eprintln!("Failed to create tmux split: {}", e);
-                // Fallback to running standalone in current pane
             }
+        }
+    } else if !is_tmux {
+        // Standalone Resize Logic (e.g. iTerm/Terminal/Ghostty)
+        // \x1b[8;ROWS;COLSt
+        if want_lyrics {
+            print!("\x1b[8;60;80t"); // Full Size: 60 rows, 80 cols
+        } else {
+            print!("\x1b[8;40;50t"); // Mini Size: 40 rows, 50 cols
         }
     }
 

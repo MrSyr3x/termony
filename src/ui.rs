@@ -41,15 +41,29 @@ impl Mocha {
 }
 
 pub fn ui(f: &mut Frame, app: &mut App) {
+    // Responsive Layout Check
+    let area = f.area();
+    let is_compressed = area.height < 45; // Mini Mode Cutoff
+
     // 1. Main Vertical Split
-    let main_chunks = Layout::default()
-        .direction(Direction::Vertical)
-        .constraints([
+    let main_constraints = if is_compressed {
+        vec![
+            Constraint::Min(36),    // Music Card (takes full space)
+            Constraint::Length(0),  // No Lyrics
+            Constraint::Length(0),  // No Footer (save space? or Length(1)?)
+        ]
+    } else {
+        vec![
             Constraint::Length(36), // Music Card
             Constraint::Min(5),     // Lyrics Card
             Constraint::Length(1),  // Footer
-        ])
-        .split(f.area());
+        ]
+    };
+
+    let main_chunks = Layout::default()
+        .direction(Direction::Vertical)
+        .constraints(main_constraints)
+        .split(area);
 
     // --- MUSIC CARD ---
     let music_title = Title::from(Line::from(vec![
@@ -85,6 +99,10 @@ pub fn ui(f: &mut Frame, app: &mut App) {
     let artwork_area = music_chunks[0];
     if let Some(data) = &app.artwork {
         let mut lines = Vec::new();
+        // Crop artwork if area is too small? 
+        // With 24 layout constraint, it's fixed.
+        // If window is smaller than 36, music_area might be small/cut off.
+        // Ratatui handles clipping.
         for row in data {
             let mut spans = Vec::new();
             for (fg, bg) in row {
@@ -120,7 +138,7 @@ pub fn ui(f: &mut Frame, app: &mut App) {
     if let Some(track) = &app.track {
         let info_text = vec![
             Line::from(Span::styled(
-                format!("🎵 {}", track.name), // Added Music Note Emoji
+                format!("🎵 {}", track.name),
                 Style::default().fg(Mocha::TEXT).add_modifier(Modifier::BOLD)
             )),
             Line::from(vec![
@@ -154,7 +172,6 @@ pub fn ui(f: &mut Frame, app: &mut App) {
             0.0
         };
         
-        // Custom Texture Gauge
         let width = gauge_area.width as usize;
         let occupied_width = (width as f64 * ratio.min(1.0).max(0.0)) as usize;
         let fill_style = Style::default().fg(Mocha::MAUVE);
@@ -227,83 +244,104 @@ pub fn ui(f: &mut Frame, app: &mut App) {
 
 
         // --- LYRICS CARD ---
-        let lyrics_title = Title::from(Line::from(vec![
-            Span::styled(" lyrics ", Style::default().fg(Mocha::CRUST).bg(Mocha::MAUVE))
-        ]));
+        // Render only if NOT compressed
+        if !is_compressed {
+            let lyrics_title = Title::from(Line::from(vec![
+                Span::styled(" lyrics ", Style::default().fg(Mocha::CRUST).bg(Mocha::MAUVE))
+            ]));
 
-        let lyrics_block = Block::default()
-            .borders(Borders::ALL)
-            .border_type(BorderType::Rounded)
-            .title(lyrics_title)
-            .title_alignment(Alignment::Center)
-            .border_style(Style::default().fg(Mocha::MAUVE))
-            .style(Style::default().bg(Color::Reset));
+            let lyrics_block = Block::default()
+                .borders(Borders::ALL)
+                .border_type(BorderType::Rounded)
+                .title(lyrics_title)
+                .title_alignment(Alignment::Center)
+                .border_style(Style::default().fg(Mocha::MAUVE))
+                .style(Style::default().bg(Color::Reset));
+                
+            let lyrics_area = lyrics_block.inner(main_chunks[1]);
+            f.render_widget(lyrics_block, main_chunks[1]);
+
+            // Lyrics Hitboxes Clear
+            app.lyrics_hitboxes.clear(); 
             
-        let lyrics_area = lyrics_block.inner(main_chunks[1]);
-        f.render_widget(lyrics_block, main_chunks[1]);
+            if let Some(lyrics) = &app.lyrics {
+                let height = lyrics_area.height as usize;
+                let current_time = track.position_ms;
+                let current_idx = lyrics.iter()
+                .position(|l| l.timestamp_ms > current_time)
+                .map(|i| if i > 0 { i - 1 } else { 0 })
+                .unwrap_or(lyrics.len().saturating_sub(1));
 
-        // Lyrics Hitboxes Clear
-        app.lyrics_hitboxes.clear(); 
+                let start_idx = if let Some(offset) = app.lyrics_offset {
+                        offset.min(lyrics.len().saturating_sub(1))
+                } else {
+                        let half_height = height / 2;
+                        current_idx.saturating_sub(half_height)
+                };
+                
+                let end_idx = (start_idx + height).min(lyrics.len());
+                
+                let mut lines = Vec::new();
+                
+                for (offset, (i, line)) in lyrics.iter().enumerate().skip(start_idx).take(end_idx - start_idx).enumerate() {
+                    let style = if i == current_idx {
+                        Style::default().add_modifier(Modifier::BOLD).fg(Mocha::GREEN)
+                    } else {
+                        Style::default().fg(Mocha::OVERLAY0)
+                    };
+                    
+                    let prefix = if i == current_idx { "● " } else { "  " };
+                    let prefix_span = if i == current_idx {
+                        Span::styled(prefix, Style::default().fg(Mocha::GREEN))
+                    } else {
+                            Span::styled(prefix, style)
+                    };
+
+                    lines.push(Line::from(vec![
+                        prefix_span,
+                        Span::styled(line.text.clone(), style)
+                    ]));
+                    
+                    let line_y = lyrics_area.y + offset as u16;
+                    let hitbox = Rect::new(lyrics_area.x, line_y, lyrics_area.width, 1);
+                    app.lyrics_hitboxes.push((hitbox, line.timestamp_ms));
+                }
+
+                let lyrics_widget = Paragraph::new(lines)
+                    .alignment(Alignment::Center)
+                    .block(Block::default().style(Style::default().bg(Color::Reset)));
+                    
+                f.render_widget(lyrics_widget, lyrics_area);
+
+            } else {
+                let no_lyrics = Paragraph::new(Text::styled("\nNo Lyrics Found", Style::default().fg(Mocha::OVERLAY0)))
+                    .alignment(Alignment::Center)
+                    .block(Block::default().style(Style::default().bg(Color::Reset)));
+                f.render_widget(no_lyrics, lyrics_area);
+            }
         
-        if let Some(lyrics) = &app.lyrics {
-            let height = lyrics_area.height as usize;
-            let current_time = track.position_ms;
-            let current_idx = lyrics.iter()
-               .position(|l| l.timestamp_ms > current_time)
-               .map(|i| if i > 0 { i - 1 } else { 0 })
-               .unwrap_or(lyrics.len().saturating_sub(1));
-
-           // Scroll Logic: Use manual offset or auto-calculated
-           let start_idx = if let Some(offset) = app.lyrics_offset {
-                offset.min(lyrics.len().saturating_sub(1))
-           } else {
-                let half_height = height / 2;
-                current_idx.saturating_sub(half_height)
-           };
-           
-           let end_idx = (start_idx + height).min(lyrics.len());
-           
-           let mut lines = Vec::new();
-           
-           for (offset, (i, line)) in lyrics.iter().enumerate().skip(start_idx).take(end_idx - start_idx).enumerate() {
-               let style = if i == current_idx {
-                   Style::default().add_modifier(Modifier::BOLD).fg(Mocha::GREEN)
-               } else {
-                   Style::default().fg(Mocha::OVERLAY0)
-               };
-               
-               let prefix = if i == current_idx { "● " } else { "  " };
-               let prefix_span = if i == current_idx {
-                   Span::styled(prefix, Style::default().fg(Mocha::GREEN))
-               } else {
-                    Span::styled(prefix, style)
-               };
-
-               lines.push(Line::from(vec![
-                   prefix_span,
-                   Span::styled(line.text.clone(), style)
-               ]));
-               
-               let line_y = lyrics_area.y + offset as u16;
-               let hitbox = Rect::new(lyrics_area.x, line_y, lyrics_area.width, 1);
-               app.lyrics_hitboxes.push((hitbox, line.timestamp_ms));
-           }
-           
-           // Scrollbar (Optional logic can be imagined here, but standard paragraph scrollbar is hard with vec slicing)
-
-           let lyrics_widget = Paragraph::new(lines)
-               .alignment(Alignment::Center)
-               .block(Block::default().style(Style::default().bg(Color::Reset)));
-               
-           f.render_widget(lyrics_widget, lyrics_area);
-
-        } else {
-            let no_lyrics = Paragraph::new(Text::styled("\nNo Lyrics Found", Style::default().fg(Mocha::OVERLAY0)))
-                .alignment(Alignment::Center)
-                 .block(Block::default().style(Style::default().bg(Color::Reset)));
-             f.render_widget(no_lyrics, lyrics_area);
-        }
-
+            // --- FOOTER ---
+            let desc_style = Style::default().fg(Mocha::SUBTEXT1); 
+            
+            let footer_text = Line::from(vec![
+                Span::styled(" q ", Style::default().fg(Mocha::RED).add_modifier(Modifier::BOLD)), 
+                Span::styled("Exit   ", desc_style),
+                
+                Span::styled("n ", Style::default().fg(Mocha::SAPPHIRE).add_modifier(Modifier::BOLD)), 
+                Span::styled("Next   ", desc_style),
+                
+                Span::styled("p ", Style::default().fg(Mocha::SAPPHIRE).add_modifier(Modifier::BOLD)), 
+                Span::styled("Prev   ", desc_style),
+                
+                Span::styled("Space ", Style::default().fg(Mocha::GREEN).add_modifier(Modifier::BOLD)), 
+                Span::styled("Play/Pause", desc_style),
+            ]);
+            
+            let footer = Paragraph::new(footer_text)
+                .alignment(Alignment::Right)
+                .block(Block::default().style(Style::default().bg(Color::Reset)));
+            f.render_widget(footer, main_chunks[2]);
+        } // End !is_compressed
     } else {
         // IDLE STATE
         let t = Paragraph::new("Music Paused / Not Running")
@@ -312,26 +350,4 @@ pub fn ui(f: &mut Frame, app: &mut App) {
             .block(Block::default().borders(Borders::ALL).border_type(BorderType::Rounded).title(" music ").title_alignment(Alignment::Center).style(Style::default().bg(Color::Reset)));
         f.render_widget(t, main_chunks[0]);
     }
-    
-    // --- FOOTER ---
-    let desc_style = Style::default().fg(Mocha::SUBTEXT1); 
-    
-    let footer_text = Line::from(vec![
-        Span::styled(" q ", Style::default().fg(Mocha::RED).add_modifier(Modifier::BOLD)), 
-        Span::styled("Exit   ", desc_style),
-        
-        Span::styled("n ", Style::default().fg(Mocha::SAPPHIRE).add_modifier(Modifier::BOLD)), 
-        Span::styled("Next   ", desc_style),
-        
-        Span::styled("p ", Style::default().fg(Mocha::SAPPHIRE).add_modifier(Modifier::BOLD)), 
-        Span::styled("Prev   ", desc_style),
-        
-        Span::styled("Space ", Style::default().fg(Mocha::GREEN).add_modifier(Modifier::BOLD)), 
-        Span::styled("Play/Pause", desc_style),
-    ]);
-    
-    let footer = Paragraph::new(footer_text)
-        .alignment(Alignment::Right)
-        .block(Block::default().style(Style::default().bg(Color::Reset)));
-    f.render_widget(footer, main_chunks[2]);
 }
