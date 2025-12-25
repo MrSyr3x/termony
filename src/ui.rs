@@ -46,15 +46,28 @@ pub fn ui(f: &mut Frame, app: &mut App) {
     
     let (music_area, lyrics_area, _is_horizontal) = if show_lyrics {
         if wide_mode {
-            // Horizontal Mode: Music Left (Fixed 45), Lyrics Right (Rest)
-            let chunks = Layout::default()
-                .direction(Direction::Horizontal)
-                .constraints([
-                    Constraint::Length(45), // Fixed width for music card
-                    Constraint::Min(10),    // Lyrics take rest
-                ])
-                .split(body_area);
-             (chunks[0], Some(chunks[1]), true)
+            // Check if SUPER WIDE (Standalone Fullscreen?)
+            if width > 120 {
+                 // Scalable Mode (Apple Music Style-ish, but balanced)
+                 let chunks = Layout::default()
+                    .direction(Direction::Horizontal)
+                    .constraints([
+                        Constraint::Percentage(50), // Music scales with window
+                        Constraint::Percentage(50), // Lyrics scales with window
+                    ])
+                    .split(body_area);
+                 (chunks[0], Some(chunks[1]), true)
+            } else {
+                 // Standard Wide (Tmux Sidebar) -> Fixed 45
+                 let chunks = Layout::default()
+                    .direction(Direction::Horizontal)
+                    .constraints([
+                        Constraint::Length(45), // Fixed width for music card
+                        Constraint::Min(10),    // Lyrics take rest
+                    ])
+                    .split(body_area);
+                 (chunks[0], Some(chunks[1]), true)
+            }
         } else {
             // Vertical Mode
             if height < 40 {
@@ -95,11 +108,9 @@ pub fn ui(f: &mut Frame, app: &mut App) {
 
     // Inner Music Layout
     let m_height = inner_music_area.height;
-    let is_cramped = m_height < 30; // standard layout needs ~32 lines
+    let is_cramped = m_height < 30; 
 
     let music_constraints = if is_cramped {
-         // Compact (Hide spacers, maybe squish art?)
-         // 20(art) + 4(info) + 1(g) + 1(t) + 1(c) = 27 lines required.
          vec![
             Constraint::Min(10),    // 0: Artwork (Shrinkable)
             Constraint::Length(4),  // 1: Info 
@@ -109,8 +120,11 @@ pub fn ui(f: &mut Frame, app: &mut App) {
          ]
     } else {
         // Normal
+        // For Scalable Mode (>120 width), we want Art to grow.
+        // For Fixed Mode (45 width), Art is capped by width anyway, but Length(24) caps height.
+        // Let's use Min(20) to allow growth in both cases.
          vec![
-            Constraint::Length(24), // 0: Artwork
+            Constraint::Min(20),    // 0: Artwork (Takes available space!)
             Constraint::Length(4),  // 1: Info 
             Constraint::Length(1),  // 2: Gauge
             Constraint::Length(1),  // 3: Time
@@ -128,26 +142,50 @@ pub fn ui(f: &mut Frame, app: &mut App) {
     // 1. Artwork
     let art_idx = 0;
     
-    if let Some(data) = &app.artwork {
-        let mut lines = Vec::new();
-        // Art might be clipped by Ratatui if area is too small.
-        for row in data {
-            let mut spans = Vec::new();
-            for (fg, bg) in row {
-                spans.push(Span::styled(
-                    "▀",
-                    Style::default()
-                        .fg(Color::Rgb(fg.0, fg.1, fg.2))
-                        .bg(Color::Rgb(bg.0, bg.1, bg.2))
-                ));
-            }
-            lines.push(Line::from(spans));
-        }
+    if let Some(raw_image) = &app.artwork {
+        // Calculate available area for artwork in characters
+        let available_width = music_chunks[art_idx].width as u32;
+        let available_height = music_chunks[art_idx].height as u32;
         
-        let artwork_widget = Paragraph::new(lines)
-            .alignment(Alignment::Center)
-            .block(Block::default().style(Style::default().bg(Color::Reset)));
-        f.render_widget(artwork_widget, music_chunks[art_idx]);
+        let render_width = available_width;
+        let render_height = available_height * 2;
+        
+        if render_width > 0 && render_height > 0 {
+            use image::imageops::FilterType;
+            use image::GenericImageView;
+            
+            // Resize raw image to exactly fit the box.
+            let resized = raw_image.resize_exact(render_width, render_height, FilterType::Triangle);
+            
+            let mut lines = Vec::new();
+            for y in (0..render_height).step_by(2) {
+                let mut spans = Vec::new();
+                for x in 0..render_width {
+                    let p1 = resized.get_pixel(x, y);
+                    let p2 = if y + 1 < render_height {
+                        resized.get_pixel(x, y + 1)
+                    } else {
+                        p1
+                    };
+
+                    let fg = (p1[0], p1[1], p1[2]);
+                    let bg = (p2[0], p2[1], p2[2]);
+                    
+                    spans.push(Span::styled(
+                        "▀",
+                        Style::default()
+                            .fg(Color::Rgb(fg.0, fg.1, fg.2))
+                            .bg(Color::Rgb(bg.0, bg.1, bg.2))
+                    ));
+                }
+                lines.push(Line::from(spans));
+            }
+            
+            let artwork_widget = Paragraph::new(lines)
+                .alignment(Alignment::Center)
+                .block(Block::default().style(Style::default().bg(Color::Reset)));
+            f.render_widget(artwork_widget, music_chunks[art_idx]);
+        }
 
     } else {
        // Placeholder
