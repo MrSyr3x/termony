@@ -9,9 +9,6 @@ use std::{io, time::Duration};
 use tokio::sync::mpsc;
 use futures::{StreamExt};
 
-use image::DynamicImage;
-use ratatui_image::picker::Picker;
-
 mod app;
 mod artwork;
 mod lyrics;
@@ -22,14 +19,14 @@ mod ui;
 use app::{App};
 use spotify::{Spotify, TrackInfo};
 use lyrics::{LyricsFetcher}; 
-use artwork::{ArtworkRenderer};
+use artwork::{ArtworkRenderer, ArtworkData};
 use theme::{Theme}; // Import Theme struct
 
 enum AppEvent {
     Input(Event),
     TrackUpdate(Option<TrackInfo>),
     LyricsUpdate(Option<Vec<lyrics::LyricLine>>),
-    ArtworkUpdate(Option<DynamicImage>),
+    ArtworkUpdate(Option<ArtworkData>),
     ThemeUpdate(Theme),
 }
 
@@ -75,15 +72,6 @@ async fn main() -> Result<()> {
     execute!(stdout, EnterAlternateScreen, EnableMouseCapture)?;
     let backend = CrosstermBackend::new(stdout);
     let mut terminal = Terminal::new(backend)?;
-
-    // Image Picker (Kitty/Sixel/HalfBlock)
-    let picker = match Picker::from_query_stdio() {
-        Ok(p) => p,
-        Err(_) => Picker::from_fontsize((8, 16)),
-    };
-    // pickle.guess_protocol() is removed/implied by query?
-    // If we want to force guess or protocol, we check docs.
-    // Usually query does it. 
 
     // In Tmux, we assume full split/window, so show lyrics by default.
     // In Standalone, strict mode applies (Mini unless --lyrics).
@@ -241,9 +229,11 @@ async fn main() -> Result<()> {
                                 let tx_art = tx.clone();
                                 tokio::spawn(async move {
                                     let renderer = ArtworkRenderer::new();
-                                    // Fetch standard image (renderer handles fetch)
-                                    if let Ok(img) = renderer.fetch_image(&url).await {
-                                        let _ = tx_art.send(AppEvent::ArtworkUpdate(Some(img))).await;
+                                    // Maximize resolution for Length(24) constraint.
+                                    // 24 rows * 2 subpixels = 48 vertical pixels.
+                                    // Square aspect ratio = 48 width roughly.
+                                    if let Ok(data) = renderer.render_from_url(&url, 48, 24).await {
+                                        let _ = tx_art.send(AppEvent::ArtworkUpdate(Some(data))).await;
                                     }
                                 });
                             }
@@ -251,18 +241,10 @@ async fn main() -> Result<()> {
                     } else {
                         last_track_id.clear();
                         last_artwork_url = None;
-                        app.artwork = None;
                     }
                 },
                 AppEvent::LyricsUpdate(lyrics) => app.lyrics = lyrics,
-                AppEvent::ArtworkUpdate(img_opt) => {
-                    if let Some(img) = img_opt {
-                         // Convert DynamicImage to ResizeProtocol
-                         app.artwork = Some(picker.new_resize_protocol(img));
-                    } else {
-                        app.artwork = None;
-                    }
-                },
+                AppEvent::ArtworkUpdate(data) => app.artwork = data,
                 AppEvent::ThemeUpdate(new_theme) => app.theme = new_theme,
             }
         }
