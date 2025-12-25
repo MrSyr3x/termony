@@ -72,7 +72,10 @@ async fn main() -> Result<()> {
     let backend = CrosstermBackend::new(stdout);
     let mut terminal = Terminal::new(backend)?;
 
-    let mut app = App::new(want_lyrics);
+    // In Tmux, we assume full split/window, so show lyrics by default.
+    // In Standalone, strict mode applies (Mini unless --lyrics).
+    let app_show_lyrics = want_lyrics || is_tmux;
+    let mut app = App::new(app_show_lyrics);
     let (tx, mut rx) = mpsc::channel(100);
 
     // 1. Input Event Task
