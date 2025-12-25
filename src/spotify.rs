@@ -129,4 +129,19 @@ impl Spotify {
         Self::run_script(&format!("tell application \"Spotify\" to set player position to {}", position_secs))?;
         Ok(())
     }
+
+    pub fn volume_up() -> Result<()> {
+        Self::run_script("tell application \"Spotify\" to set sound volume to (sound volume + 10)")?;
+        Ok(())
+    }
+
+    pub fn volume_down() -> Result<()> {
+        Self::run_script("tell application \"Spotify\" to set sound volume to (sound volume - 10)")?;
+        Ok(())
+    }
+
+    pub fn _set_volume(vol: u32) -> Result<()> {
+        Self::run_script(&format!("tell application \"Spotify\" to set sound volume to {}", vol.min(100)))?;
+        Ok(())
+    }
 }

@@ -463,7 +463,10 @@ pub fn ui(f: &mut Frame, app: &mut App) {
         Span::styled("Prev   ", desc_style),
         
         Span::styled(" Space ", Style::default().fg(theme.green).add_modifier(Modifier::BOLD)), 
-        Span::styled("Play/Pause", desc_style),
+        Span::styled("Play/Pause   ", desc_style),
+
+        Span::styled(" +/- ", Style::default().fg(theme.yellow).add_modifier(Modifier::BOLD)), 
+        Span::styled("Vol ", desc_style),
     ]);
     
     let footer = Paragraph::new(footer_text)

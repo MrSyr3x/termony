@@ -203,6 +203,8 @@ async fn main() -> Result<()> {
                         KeyCode::Char(' ') => { let _ = Spotify::play_pause(); },
                         KeyCode::Char('n') => { let _ = Spotify::next(); },
                         KeyCode::Char('p') => { let _ = Spotify::prev(); },
+                        KeyCode::Char('+') | KeyCode::Char('=') => { let _ = Spotify::volume_up(); },
+                        KeyCode::Char('-') | KeyCode::Char('_') => { let _ = Spotify::volume_down(); },
                         _ => {}
                     }
                 },
