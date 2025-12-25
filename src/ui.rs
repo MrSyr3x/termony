@@ -437,6 +437,7 @@ pub fn ui(f: &mut Frame, app: &mut App) {
            
            let lyrics_widget = Paragraph::new(lines)
                .alignment(Alignment::Center)
+               .wrap(ratatui::widgets::Wrap { trim: true }) 
                .block(Block::default().style(Style::default().bg(Color::Reset)));
                
            f.render_widget(lyrics_widget, inner_lyrics_area);
