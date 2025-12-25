@@ -21,11 +21,14 @@ use spotify::{Spotify, TrackInfo};
 use lyrics::{LyricsFetcher}; 
 use artwork::{ArtworkRenderer, ArtworkData};
 
+use theme::{Theme}; // Import Theme struct
+
 enum AppEvent {
     Input(Event),
     TrackUpdate(Option<TrackInfo>),
     LyricsUpdate(Option<Vec<lyrics::LyricLine>>),
     ArtworkUpdate(Option<ArtworkData>),
+    ThemeUpdate(Theme),
 }
 
 #[tokio::main]
@@ -95,6 +98,32 @@ async fn main() -> Result<()> {
                  if tx_spotify.send(AppEvent::TrackUpdate(info)).await.is_err() { break; }
             }
             tokio::time::sleep(Duration::from_millis(500)).await;
+        }
+    });
+
+    // 3. Theme Watcher Task 🎨
+    let tx_theme = tx.clone();
+    tokio::spawn(async move {
+        let home = std::env::var("HOME").unwrap_or_else(|_| ".".to_string());
+        let cache_path = std::path::PathBuf::from(&home).join(".cache/current-theme");
+        let mut last_theme_content = String::new();
+        
+        // Initial read
+        if let Ok(content) = std::fs::read_to_string(&cache_path) {
+            last_theme_content = content;
+        }
+
+        loop {
+            tokio::time::sleep(Duration::from_millis(1000)).await;
+            
+            if let Ok(content) = std::fs::read_to_string(&cache_path) {
+                if content != last_theme_content {
+                    last_theme_content = content;
+                    // Reload theme fully
+                    let new_theme = theme::load_current_theme();
+                    if tx_theme.send(AppEvent::ThemeUpdate(new_theme)).await.is_err() { break; }
+                }
+            }
         }
     });
     
@@ -230,6 +259,7 @@ async fn main() -> Result<()> {
                 },
                 AppEvent::LyricsUpdate(lyrics) => app.lyrics = lyrics,
                 AppEvent::ArtworkUpdate(data) => app.artwork = data,
+                AppEvent::ThemeUpdate(new_theme) => app.theme = new_theme,
             }
         }
         
