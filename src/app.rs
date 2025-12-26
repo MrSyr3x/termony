@@ -1,4 +1,4 @@
-use crate::spotify::{TrackInfo};
+use crate::player::{TrackInfo};
 use crate::lyrics::{LyricLine};
 use image::DynamicImage;
 use ratatui::layout::Rect;
@@ -52,11 +52,11 @@ impl App {
 
     pub fn handle_click(&mut self, x: u16, y: u16) {
         if self.prev_btn.contains((x, y).into()) {
-            let _ = crate::spotify::Spotify::prev();
+            let _ = crate::player::Player::prev();
         } else if self.play_btn.contains((x, y).into()) {
-            let _ = crate::spotify::Spotify::play_pause();
+            let _ = crate::player::Player::play_pause();
         } else if self.next_btn.contains((x, y).into()) {
-             let _ = crate::spotify::Spotify::next();
+             let _ = crate::player::Player::next();
         } else if self.progress_rect.contains((x, y).into()) {
             if let Some(track) = &self.track {
                 if track.duration_ms > 0 {
@@ -64,7 +64,7 @@ impl App {
                      let width = self.progress_rect.width.max(1);
                      let percent = relative_x as f64 / width as f64;
                      let target_sec = (track.duration_ms as f64 / 1000.0) * percent;
-                     let _ = crate::spotify::Spotify::seek(target_sec);
+                     let _ = crate::player::Player::seek(target_sec);
                 }
             }
         }

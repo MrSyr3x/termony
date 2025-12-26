@@ -6,7 +6,7 @@ use ratatui::{
     Frame,
 };
 use crate::app::App;
-use crate::spotify::PlayerState;
+use crate::player::PlayerState;
 
 pub fn ui(f: &mut Frame, app: &mut App) {
     let theme = &app.theme;

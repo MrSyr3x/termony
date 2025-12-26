@@ -14,12 +14,12 @@ use image::DynamicImage;
 mod app;
 mod artwork;
 mod lyrics;
-mod spotify;
+mod player; 
 mod theme;
 mod ui;
 
 use app::{App};
-use spotify::{Spotify, TrackInfo};
+use player::{Player, TrackInfo}; // Renamed from spotify
 use lyrics::{LyricsFetcher}; 
 use artwork::{ArtworkRenderer}; 
 use theme::{Theme}; // Import Theme struct
@@ -76,10 +76,9 @@ async fn main() -> Result<()> {
     let mut terminal = Terminal::new(backend)?;
 
     // In Tmux, we assume full split/window, so show lyrics by default.
-    // In Standalone, strict mode applies (Mini unless --lyrics).
-    let want_mini = args.iter().any(|a| a == "--mini");
-    let app_show_lyrics = want_lyrics || (is_tmux && !want_mini);
-    let mut app = App::new(app_show_lyrics, want_mini, is_tmux);
+    // In Standalone, strict mode applies.
+    let app_show_lyrics = want_lyrics || is_tmux;
+    let mut app = App::new(app_show_lyrics, is_tmux);
     let (tx, mut rx) = mpsc::channel(100);
 
     // 1. Input Event Task
@@ -95,7 +94,7 @@ async fn main() -> Result<()> {
     let tx_spotify = tx.clone();
     tokio::spawn(async move {
         loop {
-            let track_result = tokio::task::spawn_blocking(Spotify::get_current_track).await;
+            let track_result = tokio::task::spawn_blocking(Player::get_current_track).await;
             if let Ok(Ok(info)) = track_result {
                  if tx_spotify.send(AppEvent::TrackUpdate(info)).await.is_err() { break; }
             }
@@ -151,7 +150,7 @@ async fn main() -> Result<()> {
                                 if rect.contains((col, row).into()) {
                                     let seconds = *timestamp as f64 / 1000.0;
                                     let _ = tokio::task::block_in_place(|| {
-                                         crate::spotify::Spotify::seek(seconds)
+                                         crate::player::Player::seek(seconds)
                                     });
                                     if let Some(track) = &mut app.track {
                                         track.position_ms = *timestamp;
@@ -202,11 +201,11 @@ async fn main() -> Result<()> {
                 AppEvent::Input(Event::Key(key)) => {
                     match key.code {
                         KeyCode::Char('q') => app.is_running = false,
-                        KeyCode::Char(' ') => { let _ = Spotify::play_pause(); },
-                        KeyCode::Char('n') => { let _ = Spotify::next(); },
-                        KeyCode::Char('p') => { let _ = Spotify::prev(); },
-                        KeyCode::Char('+') | KeyCode::Char('=') => { let _ = Spotify::volume_up(); },
-                        KeyCode::Char('-') | KeyCode::Char('_') => { let _ = Spotify::volume_down(); },
+                        KeyCode::Char(' ') => { let _ = Player::play_pause(); },
+                        KeyCode::Char('n') => { let _ = Player::next(); },
+                        KeyCode::Char('p') => { let _ = Player::prev(); },
+                        KeyCode::Char('+') | KeyCode::Char('=') => { let _ = Player::volume_up(); },
+                        KeyCode::Char('-') | KeyCode::Char('_') => { let _ = Player::volume_down(); },
                         _ => {}
                     }
                 },
@@ -228,16 +227,48 @@ async fn main() -> Result<()> {
                                 }
                             });
                         }
-                        if track.artwork_url != last_artwork_url {
-                            last_artwork_url = track.artwork_url.clone();
-                            app.artwork = None;
-                            if let Some(url) = last_artwork_url.clone() {
+                        if track.artwork_url != last_artwork_url || track.source == "Music" {
+                            // Logic: 
+                            // 1. If URL changed (Spotify), update.
+                            // 2. If source is Music (URL is usually None initially), we might need to fetch.
+                            //    Wait, "last_artwork_url" tracks what we displayed.
+                            
+                            // Better Logic:
+                            let target_url = track.artwork_url.clone();
+                            let is_music_no_art = track.source == "Music" && target_url.is_none();
+                            
+                            // If we have a URL and it's new -> Fetch it.
+                            if let Some(url) = target_url {
+                                if Some(url.clone()) != last_artwork_url {
+                                    last_artwork_url = Some(url.clone());
+                                    // Fetch standard URL
+                                    let tx_art = tx.clone();
+                                    tokio::spawn(async move {
+                                        let renderer = ArtworkRenderer::new();
+                                        if let Ok(img) = renderer.fetch_image(&url).await {
+                                            let _ = tx_art.send(AppEvent::ArtworkUpdate(Some(img))).await;
+                                        }
+                                    });
+                                }
+                            } else if is_music_no_art {
+                                // Music App + No ID (or fallback). use Title/Artist as ID.
+                                // We check if we already fetched for this track ID.
+                                // "last_artwork_url" is strictly URLs.
+                                // Let's use last_track_id to prevent re-fetching for same song.
+                                // Inside this block, track_id is NEW (checked above).
+                                
+                                // So we always fetch for new Music track.
                                 let tx_art = tx.clone();
+                                let (artist, album) = (track.artist.clone(), track.album.clone());
+                                
                                 tokio::spawn(async move {
                                     let renderer = ArtworkRenderer::new();
-                                    // Fetch RAW image. Resize happens in UI.
-                                    if let Ok(img) = renderer.fetch_image(&url).await {
-                                        let _ = tx_art.send(AppEvent::ArtworkUpdate(Some(img))).await;
+                                    // 1. Find URL via iTunes
+                                    if let Ok(url) = renderer.fetch_itunes_artwork(&artist, &album).await {
+                                        // 2. Fetch Image
+                                        if let Ok(img) = renderer.fetch_image(&url).await {
+                                             let _ = tx_art.send(AppEvent::ArtworkUpdate(Some(img))).await;
+                                        }
                                     }
                                 });
                             }
