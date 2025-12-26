@@ -7,17 +7,10 @@ use ratatui::{
 };
 use crate::app::App;
 use crate::spotify::PlayerState;
-use image::GenericImageView; // Added import
 
 pub fn ui(f: &mut Frame, app: &mut App) {
     let theme = &app.theme;
     let area = f.area();
-
-    // MINI PLAYER MODE 🐣
-    if app.is_mini {
-        draw_mini_player(f, app, area);
-        return;
-    }
 
     // Responsive Logic 🧠
     // 1. Footer needs 1 line at the bottom always.
@@ -49,7 +42,7 @@ pub fn ui(f: &mut Frame, app: &mut App) {
     //       If too short (height < 40) -> Hide Lyrics (Compressed).
     // If we don't want lyrics -> Music Card only.
 
-    let show_lyrics = app.app_show_lyrics;
+    let show_lyrics = app.show_lyrics;
     
     let (music_area, lyrics_area, _is_horizontal) = if show_lyrics {
         if wide_mode {
@@ -485,110 +478,4 @@ pub fn ui(f: &mut Frame, app: &mut App) {
         .alignment(Alignment::Right)
         .block(Block::default().style(Style::default().bg(Color::Reset)));
     f.render_widget(right_footer, footer_chunks[1]);
-}
-
-fn draw_mini_player(f: &mut Frame, app: &mut App, area: Rect) {
-    let theme = &app.theme;
-
-    // Layout: Horizontal Split (Art Left, Details Right)
-    // Details: Vertical Split (Info Top, Controls Middle, Progress Bottom)
-    
-    let main_chunks = Layout::default()
-        .direction(Direction::Horizontal)
-        .constraints([
-            Constraint::Length(14), // Art Square (Approx)
-            Constraint::Min(10),    // Details
-        ])
-        .split(area);
-
-    let art_area = main_chunks[0];
-    let details_area = main_chunks[1];
-
-    // 1. Artwork (Simplified)
-    // We just render the art in the square
-    
-    // Draw Border for Art? Maybe just Art.
-    let art_block = Block::default()
-        .borders(Borders::ALL)
-        .border_type(BorderType::Rounded)
-        .border_style(Style::default().fg(theme.magenta));
-    let inner_art = art_block.inner(art_area);
-    f.render_widget(art_block, art_area);
-
-    if let Some(raw_image) = &app.artwork {
-         // Same resizing logic but adapted for small area
-         let available_width = inner_art.width as u32;
-         let available_height = inner_art.height as u32;
-         let target_height = available_height * 2;
-         
-         if available_width > 0 && available_height > 0 {
-             use image::imageops::FilterType;
-             let resized = raw_image.resize(available_width, target_height, FilterType::Triangle);
-             
-             let img_height_subpixels = resized.height();
-             let mut lines = Vec::new();
-             
-             for y in (0..img_height_subpixels).step_by(2) {
-                 let mut spans = Vec::new();
-                 for x in 0..resized.width() {
-                     let p1 = resized.get_pixel(x, y);
-                     let p2 = if y + 1 < img_height_subpixels { resized.get_pixel(x, y + 1) } else { p1 };
-                     spans.push(Span::styled("▀", Style::default().fg(Color::Rgb(p1[0], p1[1], p1[2])).bg(Color::Rgb(p2[0], p2[1], p2[2]))));
-                 }
-                 lines.push(Line::from(spans));
-             }
-             let p = Paragraph::new(lines).alignment(Alignment::Center);
-             f.render_widget(p, inner_art);
-         }
-    } else {
-        let p = Paragraph::new("♪").alignment(Alignment::Center).block(Block::default().style(Style::default().fg(theme.overlay)));
-        f.render_widget(p, inner_art);
-    }
-
-    // 2. Details (Right Side)
-    let detail_chunks = Layout::default()
-        .direction(Direction::Vertical)
-        .constraints([
-            Constraint::Length(4), // Title/Artist
-            Constraint::Min(1),    // Controls
-            Constraint::Length(1), // Progress
-        ])
-        .split(details_area);
-
-    // Title/Artist
-    if let Some(track) = &app.track {
-        let info_text = vec![
-            Line::from(Span::styled(format!("🎵 {}", track.name), Style::default().fg(theme.text).add_modifier(Modifier::BOLD))),
-            Line::from(Span::styled(format!("🎤 {}", track.artist), Style::default().fg(theme.magenta))),
-            Line::from(Span::styled(format!("💿 {}", track.album), Style::default().fg(theme.cyan).add_modifier(Modifier::DIM))),
-        ];
-        let info = Paragraph::new(info_text).alignment(Alignment::Left).wrap(ratatui::widgets::Wrap { trim: true });
-        f.render_widget(info, detail_chunks[0]);
-        
-        // Controls
-        let play_icon = if track.state == PlayerState::Playing { "⏸" } else { "▶" };
-        let controls_text = Line::from(vec![
-             Span::styled(" ⏮  ", Style::default().fg(theme.blue)),
-             Span::styled(format!(" {} ", play_icon), Style::default().fg(theme.green).add_modifier(Modifier::BOLD)),
-             Span::styled("  ⏭ ", Style::default().fg(theme.blue)),
-        ]);
-        let controls = Paragraph::new(controls_text).alignment(Alignment::Left);
-        f.render_widget(controls, detail_chunks[1]);
-        
-        // Progress
-        let ratio = if track.duration_ms > 0 { track.position_ms as f64 / track.duration_ms as f64 } else { 0.0 };
-        let width = detail_chunks[2].width as usize;
-        let occupied = (width as f64 * ratio.min(1.0).max(0.0)) as usize;
-        
-        let mut bar = String::new();
-        for i in 0..width {
-            if i < occupied { bar.push('━'); } else { bar.push('─'); }
-        }
-        let gauge = Paragraph::new(bar).style(Style::default().fg(theme.magenta));
-        f.render_widget(gauge, detail_chunks[2]);
-        
-    } else {
-        let p = Paragraph::new("Paused").style(Style::default().fg(theme.overlay));
-        f.render_widget(p, detail_chunks[0]);
-    }
 }

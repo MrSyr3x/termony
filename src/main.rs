@@ -50,58 +50,15 @@ async fn main() -> Result<()> {
     // 2. TMUX LOGIC
     if is_tmux && !is_standalone {
         // Auto-split logic (Tmux)
-        let want_mini = args.iter().any(|a| a == "--mini");
-        
-        let mut tmux_cmd = std::process::Command::new("tmux");
-        
-        if want_mini {
-             // Mini Mode Logic 🐣
-             let top_right = args.iter().any(|a| a == "--top-right");
-             let top_left = args.iter().any(|a| a == "--top-left");
-             let bottom_left = args.iter().any(|a| a == "--bottom-left");
-             // Default to bottom-right if mini but no specific corner
-             let bottom_right = args.iter().any(|a| a == "--bottom-right") || (!top_right && !top_left && !bottom_left);
-             
-             let mini_exe = format!("{} --mini --standalone {}", exe_path, if want_lyrics { "--lyrics" } else { "" });
-             
-             // Chained commands: Split Horizontal (-h), then Split Vertical (-v)
-             // Size: 50 cols width, 15 lines height
-             
-             if top_right {
-                 // Right (-h), then Top (-v -b)
-                 tmux_cmd.arg("split-window").arg("-h").arg("-l").arg("50").arg("-c").arg("#{pane_current_path}")
-                         .arg(";")
-                         .arg("split-window").arg("-v").arg("-b").arg("-l").arg("15").arg("-c").arg("#{pane_current_path}")
-                         .arg(mini_exe);
-             } else if bottom_right {
-                 // Right (-h), then Bottom (-v)
-                 tmux_cmd.arg("split-window").arg("-h").arg("-l").arg("50").arg("-c").arg("#{pane_current_path}")
-                         .arg(";")
-                         .arg("split-window").arg("-v").arg("-l").arg("15").arg("-c").arg("#{pane_current_path}")
-                         .arg(mini_exe);
-             } else if top_left {
-                 // Left (-h -b), then Top (-v -b)
-                 tmux_cmd.arg("split-window").arg("-h").arg("-b").arg("-l").arg("50").arg("-c").arg("#{pane_current_path}")
-                         .arg(";")
-                         .arg("split-window").arg("-v").arg("-b").arg("-l").arg("15").arg("-c").arg("#{pane_current_path}")
-                         .arg(mini_exe);
-             } else if bottom_left {
-                 // Left (-h -b), then Bottom (-v)
-                 tmux_cmd.arg("split-window").arg("-h").arg("-b").arg("-l").arg("50").arg("-c").arg("#{pane_current_path}")
-                         .arg(";")
-                         .arg("split-window").arg("-v").arg("-l").arg("15").arg("-c").arg("#{pane_current_path}")
-                         .arg(mini_exe);
-             }
-        } else {
-            // Standard Sidebar Mode
-            tmux_cmd.arg("split-window")
-                .arg("-h")
-                .arg("-p")
-                .arg("22") 
-                .arg(format!("{} --standalone {}", exe_path, if want_lyrics { "--lyrics" } else { "" }));
-        }
+        let status = std::process::Command::new("tmux")
+            .arg("split-window")
+            .arg("-h")
+            .arg("-p")
+            .arg("22") // Changed from "29" to "22"
+            .arg(format!("{} --standalone {}", exe_path, if want_lyrics { "--lyrics" } else { "" }))
+            .status();
 
-        match tmux_cmd.status() {
+        match status {
             Ok(_) => return Ok(()),
             Err(e) => {
                 eprintln!("Failed to create tmux split: {}", e);
@@ -120,9 +77,8 @@ async fn main() -> Result<()> {
 
     // In Tmux, we assume full split/window, so show lyrics by default.
     // In Standalone, strict mode applies (Mini unless --lyrics).
-    let want_mini = args.iter().any(|a| a == "--mini");
-    let app_show_lyrics = want_lyrics || (is_tmux && !want_mini);
-    let mut app = App::new(app_show_lyrics, want_mini);
+    let app_show_lyrics = want_lyrics || is_tmux;
+    let mut app = App::new(app_show_lyrics);
     let (tx, mut rx) = mpsc::channel(100);
 
     // 1. Input Event Task
