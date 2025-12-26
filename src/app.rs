@@ -23,14 +23,14 @@ pub struct App {
     pub lyrics_offset: Option<usize>,
     
     // Display Mode
-    pub show_lyrics: bool,
-
+    pub app_show_lyrics: bool,
+    pub is_mini: bool, // New field
 }
 
 
 
 impl App {
-    pub fn new(show_lyrics: bool) -> Self {
+    pub fn new(app_show_lyrics: bool, is_mini: bool) -> Self {
         let theme = crate::theme::load_current_theme();
         
         Self {
@@ -45,7 +45,8 @@ impl App {
             progress_rect: Rect::default(),
             lyrics_hitboxes: Vec::new(),
             lyrics_offset: None,
-            show_lyrics,
+            app_show_lyrics,
+            is_mini,
         }
     }
 
