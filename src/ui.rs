@@ -33,7 +33,8 @@ pub fn ui(f: &mut Frame, app: &mut App) {
     let height = area.height;
     
     // Thresholds
-    let wide_mode = width >= 90; // Slightly relaxed from 100
+    // Only enable horizontal split if NOT in Tmux (as per user request) AND wide enough.
+    let wide_mode = !app.is_tmux && width >= 90;
     
     // Logic:
     // If we want lyrics:
@@ -42,7 +43,7 @@ pub fn ui(f: &mut Frame, app: &mut App) {
     //       If too short (height < 40) -> Hide Lyrics (Compressed).
     // If we don't want lyrics -> Music Card only.
 
-    let show_lyrics = app.show_lyrics;
+    let show_lyrics = app.app_show_lyrics;
     
     let (music_area, lyrics_area, _is_horizontal) = if show_lyrics {
         if wide_mode {
