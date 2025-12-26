@@ -250,7 +250,8 @@ pub fn ui(f: &mut Frame, app: &mut App) {
         
         let info = Paragraph::new(info_text)
             .alignment(Alignment::Center)
-             .block(Block::default().style(Style::default().bg(Color::Reset)));
+            .wrap(ratatui::widgets::Wrap { trim: true })
+            .block(Block::default().style(Style::default().bg(Color::Reset)));
         f.render_widget(info, music_chunks[info_idx]);
 
         // 3. Gauge
