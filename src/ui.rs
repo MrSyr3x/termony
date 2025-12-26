@@ -46,28 +46,15 @@ pub fn ui(f: &mut Frame, app: &mut App) {
     
     let (music_area, lyrics_area, _is_horizontal) = if show_lyrics {
         if wide_mode {
-            // Check if SUPER WIDE (Standalone Fullscreen?)
-            if width > 120 {
-                 // Scalable Mode (Apple Music Style-ish, but balanced)
-                 let chunks = Layout::default()
-                    .direction(Direction::Horizontal)
-                    .constraints([
-                        Constraint::Percentage(60), // Music scales (Bigger Art)
-                        Constraint::Percentage(40), // Lyrics scales
-                    ])
-                    .split(body_area);
-                 (chunks[0], Some(chunks[1]), true)
-            } else {
-                 // Standard Wide (Tmux Sidebar) -> Fixed 45
-                 let chunks = Layout::default()
-                    .direction(Direction::Horizontal)
-                    .constraints([
-                        Constraint::Length(45), // Fixed width for music card
-                        Constraint::Min(10),    // Lyrics take rest
-                    ])
-                    .split(body_area);
-                 (chunks[0], Some(chunks[1]), true)
-            }
+             // Unified Horizontal Mode: Music Dominant (65%)
+             let chunks = Layout::default()
+                .direction(Direction::Horizontal)
+                .constraints([
+                    Constraint::Percentage(65), // Bigger Music
+                    Constraint::Min(10),        // Lyrics
+                ])
+                .split(body_area);
+             (chunks[0], Some(chunks[1]), true)
         } else {
             // Vertical Mode
             if height < 40 {
