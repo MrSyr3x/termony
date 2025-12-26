@@ -25,12 +25,13 @@ pub struct App {
     // Display Mode
     pub app_show_lyrics: bool,
     pub is_tmux: bool, // New field for layout logic
+    pub is_compact: bool, // New field for Compact Mode
 }
 
 
 
 impl App {
-    pub fn new(app_show_lyrics: bool, is_tmux: bool) -> Self {
+    pub fn new(app_show_lyrics: bool, is_tmux: bool, is_compact: bool) -> Self {
         let theme = crate::theme::load_current_theme();
         
         Self {
@@ -47,6 +48,7 @@ impl App {
             lyrics_offset: None,
             app_show_lyrics,
             is_tmux,
+            is_compact,
         }
     }
 

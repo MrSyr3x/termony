@@ -8,34 +8,7 @@ use ratatui::{
 use crate::app::App;
 use crate::player::PlayerState;
 
-// Helper to draw visualizer
-fn draw_visualizer(f: &mut Frame, app: &App, area: Rect, progress_percent: f64) {
-    let bars = [" ", " ", "▂", "▃", "▄", "▅", "▆", "▇", "█"];
-    let width = area.width as usize;
-    
-    // We construct a Line of Spans
-    let mut spans = Vec::new();
 
-    for i in 0..width {
-        // Map i to index in visualizer_data (200 size)
-        // Wrap around if width > 200
-        let data_idx = i % app.visualizer_bars.len();
-        let level = app.visualizer_bars[data_idx] as usize; // 0-8
-        let bar_char = bars[level.min(8)];
-        
-        // Color Logic: Progress
-        let is_played = (i as f64 / width as f64) <= progress_percent;
-        let color = if is_played {
-             app.theme.progress_fg
-        } else {
-             Color::DarkGray
-        };
-
-        spans.push(Span::styled(bar_char, Style::default().fg(color)));
-    }
-    
-    f.render_widget(Paragraph::new(Line::from(spans)), area);
-}
 
 pub fn ui(f: &mut Frame, app: &mut App) {
     let theme = &app.theme;
@@ -112,13 +85,17 @@ pub fn ui(f: &mut Frame, app: &mut App) {
         Span::styled(" Vyom ", Style::default().fg(theme.base).bg(theme.blue).add_modifier(Modifier::BOLD))
     ]));
 
-    let music_block = Block::default()
-        .borders(Borders::ALL)
-        .border_type(BorderType::Rounded)
-        .title(music_title)
-        .title_alignment(Alignment::Center)
-        .border_style(Style::default().fg(theme.blue)) 
-        .style(Style::default().bg(Color::Reset));
+    let music_block = if app.is_compact {
+         Block::default().style(Style::default().bg(Color::Reset))
+    } else {
+        Block::default()
+            .borders(Borders::ALL)
+            .border_type(BorderType::Rounded)
+            .title(music_title)
+            .title_alignment(Alignment::Center)
+            .border_style(Style::default().fg(theme.blue)) 
+            .style(Style::default().bg(Color::Reset))
+    };
     
     let inner_music_area = music_block.inner(music_area);
     f.render_widget(music_block, music_area);
@@ -294,8 +271,30 @@ pub fn ui(f: &mut Frame, app: &mut App) {
                 0.0
             };
             
-            // VISUALIZER REPLACEMENT 📊
-            draw_visualizer(f, app, gauge_area_rect, ratio);
+            let width = gauge_area_rect.width as usize;
+            let occupied_width = (width as f64 * ratio.min(1.0).max(0.0)) as usize;
+            let fill_style = Style::default().fg(theme.magenta);
+            let empty_style = Style::default().fg(theme.surface);
+            
+            let mut bar_spans: Vec<Span> = Vec::with_capacity(width);
+            for i in 0..width {
+                 if i < occupied_width {
+                    if i >= occupied_width.saturating_sub(1) {
+                        bar_spans.push(Span::styled("▓", fill_style));
+                    } else if i >= occupied_width.saturating_sub(2) {
+                        bar_spans.push(Span::styled("▒", fill_style));
+                    } else {
+                        bar_spans.push(Span::styled("█", fill_style));
+                    }
+                } else {
+                    bar_spans.push(Span::styled("░", empty_style));
+                }
+            }
+
+            let gauge_p = Paragraph::new(Line::from(bar_spans))
+                .alignment(Alignment::Left)
+                .block(Block::default().style(Style::default().bg(Color::Reset)));
+            f.render_widget(gauge_p, gauge_area_rect);
             app.progress_rect = gauge_area_rect;
         }
 
@@ -373,14 +372,18 @@ pub fn ui(f: &mut Frame, app: &mut App) {
                 .add_modifier(Modifier::BOLD | Modifier::ITALIC))
         ]);
 
-        let lyrics_block = Block::default()
-            .borders(Borders::ALL)
-            .border_type(BorderType::Rounded)
-            .title(lyrics_title)
-            .title_alignment(Alignment::Center)
-            .title_bottom(credits_title)
-            .border_style(Style::default().fg(theme.magenta))
-            .style(Style::default().bg(Color::Reset));
+        let lyrics_block = if app.is_compact {
+            Block::default().style(Style::default().bg(Color::Reset))
+        } else {
+            Block::default()
+                .borders(Borders::ALL)
+                .border_type(BorderType::Rounded)
+                .title(lyrics_title)
+                .title_alignment(Alignment::Center)
+                .title_bottom(credits_title)
+                .border_style(Style::default().fg(theme.magenta))
+                .style(Style::default().bg(Color::Reset))
+        };
         
         let inner_lyrics_area = lyrics_block.inner(lyrics_area_rect);
         f.render_widget(lyrics_block, lyrics_area_rect);

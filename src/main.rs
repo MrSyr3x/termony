@@ -77,8 +77,12 @@ async fn main() -> Result<()> {
 
     // In Tmux, we assume full split/window, so show lyrics by default.
     // In Standalone, strict mode applies.
-    let app_show_lyrics = want_lyrics || is_tmux;
-    let mut app = App::new(app_show_lyrics, is_tmux);
+    let want_compact = args.iter().any(|a| a == "--compact");
+    // If compact, we might want to hide lyrics? User's call.
+    // For now, respect --lyrics independently.
+    let app_show_lyrics = want_lyrics || (is_tmux && !want_compact);
+
+    let mut app = App::new(app_show_lyrics, is_tmux, want_compact);
     let (tx, mut rx) = mpsc::channel(100);
 
     // 1. Input Event Task
