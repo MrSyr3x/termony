@@ -31,9 +31,11 @@ I am lazy enough to automate the annoyance, and creative enough to make it beaut
 
 To run **Vyom**, you need:
 
-1.  **macOS**: Works via AppleScript to talk to Spotify/Apple Music.
-2.  **Spotify** (Desktop App) running.
-3.  **Rust**: To build it.
+1.  **macOS**: This app uses AppleScript (JXA) to communicate with music players. It is **macOS only** (for now).
+2.  **Music or Spotify**: The desktop application must be running.
+3.  **Permissions**:
+    *   On the first run, macOS will ask for permission to control Spotify/Music.
+    *   **If it fails to connect**: Go to `System Settings` -> `Privacy & Security` -> `Automation` and ensure your Terminal (e.g., iTerm2, Alacritty, Ghostty) has permission to control `Spotify` or `Music`.
 
 ## Installation 🚀
 

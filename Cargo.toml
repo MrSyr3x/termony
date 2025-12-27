@@ -4,11 +4,10 @@ version = "0.1.0"
 edition = "2021"
 description = "A minimalist, transparent Spotify music player for tmux with Catppuccin theming."
 license = "MIT"
-repository = "https://github.com/MrSyr3x/termony.git"
+repository = "https://github.com/MrSyr3x/vyom.git"
 keywords = ["tmux", "spotify", "music", "tui", "ratatui"]
 categories = ["command-line-utilities", "multimedia"]
 exclude = ["images/*", ".github/*"]
-publish = false
 
 [dependencies]
 ratatui = { version = "0.29.0", features = ["serde"] }
