@@ -13,16 +13,19 @@ use image::DynamicImage;
 
 mod app;
 mod artwork;
+mod theme; 
 mod lyrics;
 mod player; 
-mod theme;
 mod ui;
 
 use app::{App};
-use player::{Player, TrackInfo}; // Renamed from spotify
+use player::{TrackInfo}; 
 use lyrics::{LyricsFetcher}; 
 use artwork::{ArtworkRenderer}; 
-use theme::{Theme}; // Import Theme struct
+
+
+use theme::{Theme};
+
 
 enum AppEvent {
     Input(Event),
@@ -77,13 +80,14 @@ async fn main() -> Result<()> {
 
     // In Tmux, we assume full split/window, so show lyrics by default.
     // In Standalone, strict mode applies.
-    let want_compact = args.iter().any(|a| a == "--compact");
-    // If compact, we might want to hide lyrics? User's call.
-    // For now, respect --lyrics independently.
-    let app_show_lyrics = want_lyrics || (is_tmux && !want_compact);
+    let app_show_lyrics = want_lyrics || is_tmux;
 
-    let mut app = App::new(app_show_lyrics, is_tmux, want_compact);
-    let (tx, mut rx) = mpsc::channel(100);
+    // 1. Initial State
+    let mut app = App::new(app_show_lyrics, is_tmux);
+    let player = player::get_player(); // Factory Pattern
+    let (tx, mut rx) = mpsc::channel(100); // 👈 Restore Channel
+
+
 
     // 1. Input Event Task
     let tx_input = tx.clone();
@@ -98,7 +102,12 @@ async fn main() -> Result<()> {
     let tx_spotify = tx.clone();
     tokio::spawn(async move {
         loop {
-            let track_result = tokio::task::spawn_blocking(Player::get_current_track).await;
+            // Create fresh player for thread safety (MacOsPlayer is stateless)
+            let track_result = tokio::task::spawn_blocking(|| {
+                let p = player::get_player();
+                p.get_current_track()
+            }).await;
+            
             if let Ok(Ok(info)) = track_result {
                  if tx_spotify.send(AppEvent::TrackUpdate(info)).await.is_err() { break; }
             }
@@ -109,26 +118,19 @@ async fn main() -> Result<()> {
     // 3. Theme Watcher Task 🎨
     let tx_theme = tx.clone();
     tokio::spawn(async move {
-        let home = std::env::var("HOME").unwrap_or_else(|_| ".".to_string());
-        // Watch the actual config file now
-        let config_path = std::path::PathBuf::from(&home).join(".config/vyom/theme.toml");
-        let mut last_content = String::new();
-        
-        // Initial read
-        if let Ok(content) = std::fs::read_to_string(&config_path) {
-            last_content = content;
-        }
+        // We act like a dumb poller for now. 
+        let mut last_theme_debug = format!("{:?}", theme::load_current_theme());
 
         loop {
-            tokio::time::sleep(Duration::from_millis(1000)).await;
+            tokio::time::sleep(Duration::from_millis(250)).await;
             
-            if let Ok(content) = std::fs::read_to_string(&config_path) {
-                if content != last_content {
-                    last_content = content;
-                    // Reload theme fully
-                    let new_theme = theme::load_current_theme();
-                    if tx_theme.send(AppEvent::ThemeUpdate(new_theme)).await.is_err() { break; }
-                }
+            // Reload & Check difference based on Debug impl (hacky but cheap)
+            let new_theme = theme::load_current_theme();
+            let new_debug = format!("{:?}", new_theme);
+            
+            if new_debug != last_theme_debug {
+                last_theme_debug = new_debug;
+                 if tx_theme.send(AppEvent::ThemeUpdate(new_theme)).await.is_err() { break; }
             }
         }
     });
@@ -155,7 +157,9 @@ async fn main() -> Result<()> {
                                 if rect.contains((col, row).into()) {
                                     let seconds = *timestamp as f64 / 1000.0;
                                     let _ = tokio::task::block_in_place(|| {
-                                         crate::player::Player::seek(seconds)
+                                         // Fresh player
+                                         let p = crate::player::get_player();
+                                         p.seek(seconds)
                                     });
                                     if let Some(track) = &mut app.track {
                                         track.position_ms = *timestamp;
@@ -167,8 +171,9 @@ async fn main() -> Result<()> {
                             }
                             
                             if !hit_lyrics {
-                                app.handle_click(col, row);
+                                app.handle_click(col, row, player.as_ref());
                             }
+
                         }
                         MouseEventKind::ScrollDown => {
                             if let (Some(lyrics), Some(track)) = (&app.lyrics, &app.track) {
@@ -206,11 +211,11 @@ async fn main() -> Result<()> {
                 AppEvent::Input(Event::Key(key)) => {
                     match key.code {
                         KeyCode::Char('q') => app.is_running = false,
-                        KeyCode::Char(' ') => { let _ = Player::play_pause(); },
-                        KeyCode::Char('n') => { let _ = Player::next(); },
-                        KeyCode::Char('p') => { let _ = Player::prev(); },
-                        KeyCode::Char('+') | KeyCode::Char('=') => { let _ = Player::volume_up(); },
-                        KeyCode::Char('-') | KeyCode::Char('_') => { let _ = Player::volume_down(); },
+                        KeyCode::Char(' ') => { let _ = player.play_pause(); },
+                        KeyCode::Char('n') => { let _ = player.next(); },
+                        KeyCode::Char('p') => { let _ = player.prev(); },
+                        KeyCode::Char('+') | KeyCode::Char('=') => { let _ = player.volume_up(); },
+                        KeyCode::Char('-') | KeyCode::Char('_') => { let _ = player.volume_down(); },
                         _ => {}
                     }
                 },

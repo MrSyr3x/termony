@@ -21,13 +21,38 @@ pub struct TrackInfo {
     pub source: String, // "Spotify" or "Music"
 }
 
-// Unified Player Struct
-pub struct Player;
+/// The unified interface for any OS Media Player 🎵
+pub trait PlayerTrait {
+    fn get_current_track(&self) -> Result<Option<TrackInfo>>;
+    fn play_pause(&self) -> Result<()>;
+    fn next(&self) -> Result<()>;
+    fn prev(&self) -> Result<()>;
+    fn seek(&self, position_secs: f64) -> Result<()>;
+    fn volume_up(&self) -> Result<()>;
+    fn volume_down(&self) -> Result<()>;
+}
 
-impl Player {
+/// Factory to get the correct player for the current OS
+pub fn get_player() -> Box<dyn PlayerTrait> {
+    #[cfg(target_os = "macos")]
+    {
+        Box::new(MacOsPlayer)
+    }
+    #[cfg(not(target_os = "macos"))]
+    {
+        // Placeholder for Linux/Windows
+        Box::new(DummyPlayer)
+    }
+}
+
+// --- macOS Implementation 🍎 ---
+
+pub struct MacOsPlayer;
+
+impl MacOsPlayer {
     /// Detect which player is active: "Spotify", "Music", or None.
     /// Prioritizes Spotify if both are running.
-    pub fn detect_active_player() -> Option<&'static str> {
+    fn detect_active_player(&self) -> Option<&'static str> {
         if Self::is_app_running("Spotify") {
             Some("Spotify")
         } else if Self::is_app_running("Music") {
@@ -63,17 +88,15 @@ impl Player {
 
         Ok(String::from_utf8_lossy(&output.stdout).trim().to_string())
     }
+}
 
-    pub fn get_current_track() -> Result<Option<TrackInfo>> {
-        let app_name = match Self::detect_active_player() {
+impl PlayerTrait for MacOsPlayer {
+    fn get_current_track(&self) -> Result<Option<TrackInfo>> {
+        let app_name = match self.detect_active_player() {
             Some(app) => app,
             None => return Ok(None),
         };
 
-        // AppleScript Logic (Polylimorphic)
-        // Note: 'artwork url' only works for Spotify. 
-        // For Apple Music, we return empty string for Art and handle it in main.rs via Search API.
-        
         let script = format!(r#"
             tell application "{}"
                 if player state is stopped then
@@ -83,8 +106,8 @@ impl Player {
                 set tName to name of current track
                 set tArtist to artist of current track
                 set tAlbum to album of current track
-                set tDuration to duration of current track -- in milliseconds (Music app uses seconds usually? No, seconds for Music app!)
-                set tPosition to player position -- in seconds
+                set tDuration to duration of current track
+                set tPosition to player position
                 set tState to player state as string
                 
                 if "{}" is "Spotify" then
@@ -92,10 +115,7 @@ impl Player {
                     set tArtwork to artwork url of current track
                     return tName & "|||" & tArtist & "|||" & tAlbum & "|||" & tDuration & "|||" & tPosition & "|||" & tState & "|||" & tArtwork
                 else
-                    -- Music App Duration is SECONDS usually? Let's check docs. Standard is seconds.
-                    -- Actually Music App: duration is seconds.
-                    -- Warning: Spotify: duration is ms.
-                    
+                    -- Music App: duration is seconds
                     set tDurSec to duration of current track
                     set tDuration to tDurSec * 1000
                     return tName & "|||" & tArtist & "|||" & tAlbum & "|||" & tDuration & "|||" & tPosition & "|||" & tState & "|||" & "NONE"
@@ -122,7 +142,6 @@ impl Player {
                     _ => PlayerState::Stopped,
                 };
                 
-                // Duration parsing
                 let duration_ms: u64 = parts[3].parse::<f64>().unwrap_or(0.0) as u64;
 
                 Ok(Some(TrackInfo {
@@ -140,45 +159,60 @@ impl Player {
         }
     }
 
-    pub fn play_pause() -> Result<()> {
-        if let Some(app) = Self::detect_active_player() {
+    fn play_pause(&self) -> Result<()> {
+        if let Some(app) = self.detect_active_player() {
             Self::run_script(&format!("tell application \"{}\" to playpause", app))?;
         }
         Ok(())
     }
 
-    pub fn next() -> Result<()> {
-        if let Some(app) = Self::detect_active_player() {
+    fn next(&self) -> Result<()> {
+        if let Some(app) = self.detect_active_player() {
             Self::run_script(&format!("tell application \"{}\" to next track", app))?;
         }
         Ok(())
     }
 
-    pub fn prev() -> Result<()> {
-        if let Some(app) = Self::detect_active_player() {
+    fn prev(&self) -> Result<()> {
+        if let Some(app) = self.detect_active_player() {
              Self::run_script(&format!("tell application \"{}\" to previous track", app))?;
         }
         Ok(())
     }
 
-    pub fn seek(position_secs: f64) -> Result<()> {
-        if let Some(app) = Self::detect_active_player() {
+    fn seek(&self, position_secs: f64) -> Result<()> {
+        if let Some(app) = self.detect_active_player() {
             Self::run_script(&format!("tell application \"{}\" to set player position to {}", app, position_secs))?;
         }
         Ok(())
     }
 
-    pub fn volume_up() -> Result<()> {
-        if let Some(app) = Self::detect_active_player() {
+    fn volume_up(&self) -> Result<()> {
+        if let Some(app) = self.detect_active_player() {
              Self::run_script(&format!("tell application \"{}\" to set sound volume to (sound volume + 10)", app))?;
         }
         Ok(())
     }
 
-    pub fn volume_down() -> Result<()> {
-        if let Some(app) = Self::detect_active_player() {
+    fn volume_down(&self) -> Result<()> {
+        if let Some(app) = self.detect_active_player() {
             Self::run_script(&format!("tell application \"{}\" to set sound volume to (sound volume - 10)", app))?;
         }
         Ok(())
     }
+}
+
+// --- Dummy Implementation (Linux/Windows Placeholder) ---
+#[cfg(not(target_os = "macos"))]
+pub struct DummyPlayer;
+
+#[cfg(not(target_os = "macos"))]
+impl PlayerTrait for DummyPlayer {
+    fn get_current_track(&self) -> Result<Option<TrackInfo>> { Ok(None) }
+    fn play_pause(&self) -> Result<()> { Ok(()) }
+    fn next(&self) -> Result<()> { Ok(()) }
+    fn prev(&self) -> Result<()> { Ok(()) }
+    fn seek(&self, _pos: f64) -> Result<()> { Ok(()) }
+    fn volume_up(&self) -> Result<()> { Ok(()) }
+    fn volume_down(&self) -> Result<()> { Ok(()) }
 }

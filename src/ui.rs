@@ -85,17 +85,13 @@ pub fn ui(f: &mut Frame, app: &mut App) {
         Span::styled(" Vyom ", Style::default().fg(theme.base).bg(theme.blue).add_modifier(Modifier::BOLD))
     ]));
 
-    let music_block = if app.is_compact {
-         Block::default().style(Style::default().bg(Color::Reset))
-    } else {
-        Block::default()
-            .borders(Borders::ALL)
-            .border_type(BorderType::Rounded)
-            .title(music_title)
-            .title_alignment(Alignment::Center)
-            .border_style(Style::default().fg(theme.blue)) 
-            .style(Style::default().bg(Color::Reset))
-    };
+    let music_block = Block::default()
+        .borders(Borders::ALL)
+        .border_type(BorderType::Rounded)
+        .title(music_title)
+        .title_alignment(Alignment::Center)
+        .border_style(Style::default().fg(theme.blue)) 
+        .style(Style::default().bg(Color::Reset));
     
     let inner_music_area = music_block.inner(music_area);
     f.render_widget(music_block, music_area);
@@ -210,6 +206,7 @@ pub fn ui(f: &mut Frame, app: &mut App) {
                 .block(Block::default().style(Style::default().bg(Color::Reset)));
             f.render_widget(artwork_widget, artwork_area);
         }
+
 
     } else {
        // Placeholder
@@ -372,18 +369,14 @@ pub fn ui(f: &mut Frame, app: &mut App) {
                 .add_modifier(Modifier::BOLD | Modifier::ITALIC))
         ]);
 
-        let lyrics_block = if app.is_compact {
-            Block::default().style(Style::default().bg(Color::Reset))
-        } else {
-            Block::default()
-                .borders(Borders::ALL)
-                .border_type(BorderType::Rounded)
-                .title(lyrics_title)
-                .title_alignment(Alignment::Center)
-                .title_bottom(credits_title)
-                .border_style(Style::default().fg(theme.magenta))
-                .style(Style::default().bg(Color::Reset))
-        };
+        let lyrics_block = Block::default()
+            .borders(Borders::ALL)
+            .border_type(BorderType::Rounded)
+            .title(lyrics_title)
+            .title_alignment(Alignment::Center)
+            .title_bottom(credits_title)
+            .border_style(Style::default().fg(theme.magenta))
+            .style(Style::default().bg(Color::Reset));
         
         let inner_lyrics_area = lyrics_block.inner(lyrics_area_rect);
         f.render_widget(lyrics_block, lyrics_area_rect);

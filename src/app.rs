@@ -1,12 +1,15 @@
-use crate::player::{TrackInfo};
+use crate::player::{TrackInfo, PlayerTrait};
 use crate::lyrics::{LyricLine};
+
 use image::DynamicImage;
 use ratatui::layout::Rect;
 
 use crate::theme::Theme;
 
+
 pub struct App {
     pub theme: Theme,
+
     pub is_running: bool,
     pub track: Option<TrackInfo>,
     pub lyrics: Option<Vec<LyricLine>>,
@@ -25,13 +28,12 @@ pub struct App {
     // Display Mode
     pub app_show_lyrics: bool,
     pub is_tmux: bool, // New field for layout logic
-    pub is_compact: bool, // New field for Compact Mode
 }
 
 
 
 impl App {
-    pub fn new(app_show_lyrics: bool, is_tmux: bool, is_compact: bool) -> Self {
+    pub fn new(app_show_lyrics: bool, is_tmux: bool) -> Self {
         let theme = crate::theme::load_current_theme();
         
         Self {
@@ -48,17 +50,16 @@ impl App {
             lyrics_offset: None,
             app_show_lyrics,
             is_tmux,
-            is_compact,
         }
     }
 
-    pub fn handle_click(&mut self, x: u16, y: u16) {
+    pub fn handle_click(&mut self, x: u16, y: u16, player: &dyn PlayerTrait) {
         if self.prev_btn.contains((x, y).into()) {
-            let _ = crate::player::Player::prev();
+            let _ = player.prev();
         } else if self.play_btn.contains((x, y).into()) {
-            let _ = crate::player::Player::play_pause();
+            let _ = player.play_pause();
         } else if self.next_btn.contains((x, y).into()) {
-             let _ = crate::player::Player::next();
+             let _ = player.next();
         } else if self.progress_rect.contains((x, y).into()) {
             if let Some(track) = &self.track {
                 if track.duration_ms > 0 {
@@ -66,7 +67,7 @@ impl App {
                      let width = self.progress_rect.width.max(1);
                      let percent = relative_x as f64 / width as f64;
                      let target_sec = (track.duration_ms as f64 / 1000.0) * percent;
-                     let _ = crate::player::Player::seek(target_sec);
+                     let _ = player.seek(target_sec);
                 }
             }
         }
